@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Everything for this app lives under one family's namespace. There's no
+    // login system — anyone who knows your VITE_FAMILY_ID can read/write it,
+    // so treat that value like a shared house key, not a public one.
+    match /families/{familyId}/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
