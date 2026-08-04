@@ -1,68 +1,179 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../../lib/store'
+import { GRADIENT } from '../../lib/theme'
+import { WEEKDAY_LABELS } from '../../lib/dates'
+import type { Weekday } from '../../types'
 
-interface Props {
-  onSuccess: () => void
-  onBack: () => void
-}
+const EMOJI_CHOICES = ['🧽', '🧹', '🍽️', '🛏️', '🧺', '🗑️', '🐶', '🌱', '🚗', '📚', '🧸', '🪟']
 
-export default function ParentGate({ onSuccess, onBack }: Props) {
-  const { data } = useStore()
-  const [pin, setPin] = useState('')
-  const [error, setError] = useState(false)
+export default function ChoresTab() {
+  const { data, addChore, updateChore, removeChore } = useStore()
+  const [kidId, setKidId] = useState(data.kids[0]?.id ?? '')
+
+  useEffect(() => {
+    if (data.kids.length > 0 && !data.kids.some((k) => k.id === kidId)) {
+      setKidId(data.kids[0].id)
+    }
+  }, [data.kids, kidId])
+  const [title, setTitle] = useState('')
+  const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
+  const [points, setPoints] = useState(10)
+  const [days, setDays] = useState<Weekday[]>([])
+
+  function toggleDay(d: Weekday) {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()))
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (pin === data.parentPin) {
-      onSuccess()
-    } else {
-      setError(true)
-      setPin('')
-      setTimeout(() => setError(false), 1500)
-    }
+    if (!title.trim() || !kidId) return
+    addChore(kidId, title.trim(), emoji, points, days)
+    setTitle('')
+    setPoints(10)
+    setDays([])
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6">
-      <button
-        onClick={onBack}
-        className="glass absolute left-6 top-8 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/70 hover:text-white"
-      >
-        <ArrowLeft size={14} /> Back
-      </button>
+    <div className="space-y-8">
+      <form onSubmit={submit} className="glass rounded-2xl p-5">
+        <h2 className="font-display text-lg font-bold">Add a chore</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Kid</label>
+            <select
+              value={kidId}
+              onChange={(e) => setKidId(e.target.value)}
+              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
+            >
+              {data.kids.map((k) => (
+                <option key={k.id} value={k.id} className="bg-[#14141f]">
+                  {k.emoji} {k.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Points</label>
+            <input
+              type="number"
+              min={1}
+              value={points}
+              onChange={(e) => setPoints(Number(e.target.value))}
+              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
+            />
+          </div>
+        </div>
 
-      <div className="glass flex h-16 w-16 items-center justify-center rounded-full">
-        <Lock size={24} className="text-fuchsia-400" />
-      </div>
-      <h1 className="mt-5 font-display text-2xl font-bold">Parent Mode</h1>
-      <p className="mt-2 text-center text-sm text-white/50">Enter the parent PIN to manage chores &amp; rewards.</p>
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Chore title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Wash the dishes"
+            className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
+          />
+        </div>
 
-      <motion.form
-        onSubmit={submit}
-        animate={error ? { x: [0, -8, 8, -8, 0] } : {}}
-        className="mt-8 w-full"
-      >
-        <input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="Enter PIN"
-          className="glass w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
-        />
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Icon</label>
+          <div className="flex flex-wrap gap-2">
+            {EMOJI_CHOICES.map((e) => (
+              <button
+                type="button"
+                key={e}
+                onClick={() => setEmoji(e)}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition ${
+                  emoji === e ? 'bg-fuchsia-500/30 ring-2 ring-fuchsia-400' : 'bg-white/5 hover:bg-white/10'
+                }`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">
+            Days (leave blank for every day)
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {WEEKDAY_LABELS.map((label, i) => (
+              <button
+                type="button"
+                key={label}
+                onClick={() => toggleDay(i as Weekday)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  days.includes(i as Weekday) ? 'bg-cyan-400/30 text-cyan-200 ring-2 ring-cyan-300' : 'bg-white/5 text-white/60 hover:bg-white/10'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button
           type="submit"
-          className="mt-4 w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 py-3 font-semibold text-black transition hover:opacity-90"
+          disabled={!data.kids.length}
+          className="mt-5 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-40"
         >
-          Unlock
+          <Plus size={15} /> Add chore
         </button>
-        {error && <p className="mt-3 text-center text-sm text-rose-400">Incorrect PIN, try again.</p>}
-      </motion.form>
+      </form>
 
-      <p className="mt-6 text-xs text-white/30">Default PIN is 1234 &mdash; change it from the parent dashboard.</p>
+      <section>
+        <h2 className="font-display text-lg font-bold">All chores</h2>
+        <div className="mt-4 space-y-6">
+          {data.kids.map((kid) => {
+            const kidChores = data.chores.filter((c) => c.kidId === kid.id)
+            if (!kidChores.length) return null
+            return (
+              <div key={kid.id}>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/70">
+                  <span className={`h-2 w-2 rounded-full bg-gradient-to-br ${GRADIENT[kid.color]}`} /> {kid.emoji} {kid.name}
+                </div>
+                <div className="space-y-2">
+                  {kidChores.map((chore) => (
+                    <div key={chore.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{chore.emoji}</span>
+                        <div>
+                          <div className="text-sm font-medium">{chore.title}</div>
+                          <div className="text-xs text-white/40">
+                            {chore.points} pts &middot;{' '}
+                            {chore.days.length === 0
+                              ? 'Every day'
+                              : chore.days.map((d) => WEEKDAY_LABELS[d]).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 text-xs text-white/50">
+                          <input
+                            type="checkbox"
+                            checked={chore.active}
+                            onChange={(e) => updateChore(chore.id, { active: e.target.checked })}
+                            className="accent-fuchsia-500"
+                          />
+                          Active
+                        </label>
+                        <button
+                          onClick={() => removeChore(chore.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/50 hover:bg-rose-500/20 hover:text-rose-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          {data.chores.length === 0 && <div className="glass rounded-2xl p-6 text-center text-white/40">No chores yet.</div>}
+        </div>
+      </section>
     </div>
   )
 }

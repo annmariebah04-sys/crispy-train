@@ -1,201 +1,71 @@
-import { useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Trash2 } from 'lucide-react'
-import { GRADIENT, KID_COLOR_OPTIONS, EMOJI_CHOICES } from '../../lib/theme'
-import { fileToAvatarDataUrl, fileToBackgroundDataUrl } from '../../lib/image'
-import type { Kid } from '../../types'
-
-type Patch = Partial<Pick<Kid, 'emoji' | 'color' | 'photo' | 'background'>>
+import { motion } from 'framer-motion'
+import { Lock } from 'lucide-react'
+import { useStore } from '../lib/store'
+import { GRADIENT } from '../lib/theme'
+import CountdownPill from './CountdownPill'
+import KidAvatar from './KidAvatar'
 
 interface Props {
-  open: boolean
-  kid: Pick<Kid, 'emoji' | 'color' | 'photo' | 'background'>
-  onUpdate: (patch: Patch) => void
-  onClose: () => void
+  onSelectKid: (kidId: string) => void
+  onParent: () => void
 }
 
-export default function AvatarPicker({ open, kid, onUpdate, onClose }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const bgInputRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState<'photo' | 'background' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file.')
-      return
-    }
-    setError(null)
-    setBusy('photo')
-    try {
-      const dataUrl = await fileToAvatarDataUrl(file)
-      onUpdate({ photo: dataUrl })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load that photo, try another one.")
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function handleBackgroundFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file.')
-      return
-    }
-    setError(null)
-    setBusy('background')
-    try {
-      const dataUrl = await fileToBackgroundDataUrl(file)
-      onUpdate({ background: dataUrl })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load that image, try another one.")
-    } finally {
-      setBusy(null)
-    }
-  }
+export default function HomeScreen({ onSelectKid, onParent }: Props) {
+  const { data } = useStore()
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6"
-          onClick={onClose}
+    <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center px-6 py-12">
+      <header className="flex w-full items-center justify-between">
+        <div className="font-display text-xl font-bold tracking-tight">
+          Chore<span className="bg-gradient-to-r from-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">Quest</span>
+        </div>
+        <button
+          onClick={onParent}
+          className="glass flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white/80 transition hover:text-white"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.96 }}
-            onClick={(e) => e.stopPropagation()}
-            className="glass max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl p-6"
+          <Lock size={14} />
+          Parent mode
+        </button>
+      </header>
+
+      <div className="mt-10">
+        <CountdownPill />
+      </div>
+
+      <div className="mt-4 text-center">
+        <h1 className="font-display text-4xl font-bold sm:text-5xl">Who's crushing it today?</h1>
+        <p className="mt-3 text-white/50">Pick your profile to see today's chores &amp; rewards.</p>
+      </div>
+
+      <div className="mt-14 grid w-full grid-cols-1 gap-6 sm:grid-cols-3">
+        {data.kids.map((kid, i) => (
+          <motion.button
+            key={kid.id}
+            onClick={() => onSelectKid(kid.id)}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08, duration: 0.4 }}
+            whileHover={{ y: -6, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="glass group relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl p-8"
           >
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold">Pick your look</h2>
-              <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/60 hover:text-white">
-                <X size={15} />
-              </button>
-            </div>
-
             <div
-              className={`mx-auto mt-5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br ${GRADIENT[kid.color]} text-4xl`}
-            >
-              {kid.photo ? <img src={kid.photo} alt="" className="h-full w-full object-cover" /> : kid.emoji}
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${GRADIENT[kid.color]} opacity-0 transition-opacity duration-300 group-hover:opacity-15`}
+            />
+            <KidAvatar kid={kid} className="h-24 w-24 text-5xl" glow />
+            <div className="text-center">
+              <div className="font-display text-xl font-bold">{kid.name}</div>
+              <div className="mt-1 text-sm text-white/50">{kid.points} pts</div>
             </div>
+          </motion.button>
+        ))}
+      </div>
 
-            <div className="mt-5 flex justify-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFile}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy !== null}
-                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2 text-xs font-semibold text-black transition hover:opacity-90 disabled:opacity-60"
-              >
-                <Upload size={13} /> {busy === 'photo' ? 'Uploading…' : 'Upload photo'}
-              </button>
-              {kid.photo && (
-                <button
-                  onClick={() => onUpdate({ photo: undefined })}
-                  className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/15 hover:text-white"
-                >
-                  <Trash2 size={13} /> Remove
-                </button>
-              )}
-            </div>
-            {error && <p className="mt-2 text-center text-xs text-rose-400">{error}</p>}
-
-            <div className="mt-6">
-              <label className="mb-2 block text-xs text-white/50">
-                {kid.photo ? 'Or use an emoji instead' : 'Avatar'}
-              </label>
-              <div className="flex flex-wrap justify-center gap-2">
-                {EMOJI_CHOICES.map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => onUpdate({ emoji: e, photo: undefined })}
-                    className={`flex h-11 w-11 items-center justify-center rounded-xl text-2xl transition ${
-                      !kid.photo && kid.emoji === e ? 'bg-fuchsia-500/30 ring-2 ring-fuchsia-400' : 'bg-white/5 hover:bg-white/10'
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-2 block text-xs text-white/50">Color</label>
-              <div className="flex flex-wrap justify-center gap-3">
-                {KID_COLOR_OPTIONS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => onUpdate({ color: c })}
-                    className={`h-10 w-10 rounded-full bg-gradient-to-br ${GRADIENT[c]} transition ${
-                      kid.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#14141f]' : 'opacity-70 hover:opacity-100'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-2 block text-xs text-white/50">Background</label>
-              <div className="flex items-center gap-3">
-                <div className="h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-white/5 ring-1 ring-white/10">
-                  {kid.background ? (
-                    <img src={kid.background} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className={`h-full w-full bg-gradient-to-br ${GRADIENT[kid.color]} opacity-30`} />
-                  )}
-                </div>
-                <div className="flex flex-1 flex-wrap gap-2">
-                  <input
-                    ref={bgInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleBackgroundFile}
-                  />
-                  <button
-                    onClick={() => bgInputRef.current?.click()}
-                    disabled={busy !== null}
-                    className="flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
-                  >
-                    <Upload size={13} /> {busy === 'background' ? 'Uploading…' : 'Upload background'}
-                  </button>
-                  {kid.background && (
-                    <button
-                      onClick={() => onUpdate({ background: undefined })}
-                      className="flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/15 hover:text-white"
-                    >
-                      <Trash2 size={13} /> Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="mt-7 w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
-            >
-              Done
-            </button>
-          </motion.div>
-        </motion.div>
+      {data.kids.length === 0 && (
+        <div className="glass mt-14 rounded-2xl px-8 py-10 text-center text-white/60">
+          No profiles yet. Ask a parent to add kid profiles in Parent mode.
+        </div>
       )}
-    </AnimatePresence>
+    </div>
   )
 }

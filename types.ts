@@ -1,60 +1,29 @@
-export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = Sunday
+import { initializeApp } from 'firebase/app'
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 
-export interface Kid {
-  id: string
-  name: string
-  emoji: string
-  color: string // tailwind gradient key, see theme.ts
-  photo?: string // optional uploaded avatar image, as a data URL
-  background?: string // optional uploaded background image, as a data URL
-  points: number
-  totalEarned: number
-  createdAt: number
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-export interface Chore {
-  id: string
-  kidId: string
-  title: string
-  emoji: string
-  points: number
-  days: Weekday[] // which weekdays this chore is active; empty = every day
-  active: boolean
-  createdAt: number
-}
+// A private, hard-to-guess namespace so this family's data lives at its own
+// path in Firestore. Not a substitute for real auth, but keeps one family's
+// chores separate from anyone else who might reuse the same Firebase project.
+export const familyId: string = import.meta.env.VITE_FAMILY_ID || 'default-family'
 
-export interface Completion {
-  id: string
-  kidId: string
-  choreId: string
-  dayKey: string // which chore-cycle day this completion belongs to
-  completedAt: number
-}
+export const missingFirebaseConfig = Object.entries(firebaseConfig)
+  .filter(([, v]) => !v)
+  .map(([k]) => k)
 
-export interface Reward {
-  id: string
-  title: string
-  emoji: string
-  cost: number
-  active: boolean
-  createdAt: number
-}
+const app = initializeApp(firebaseConfig)
+export const db = getFirestore(app)
 
-export interface Redemption {
-  id: string
-  kidId: string
-  rewardId: string
-  cost: number
-  requestedAt: number
-  fulfilled: boolean
-  fulfilledAt?: number
-}
-
-export interface AppData {
-  kids: Kid[]
-  chores: Chore[]
-  completions: Completion[]
-  rewards: Reward[]
-  redemptions: Redemption[]
-  parentPin: string
+// For local development against `firebase emulators:start` — never used in
+// a deployed build.
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
 }

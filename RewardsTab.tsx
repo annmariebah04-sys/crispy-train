@@ -1,50 +1,37 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../../lib/store'
+import { GRADIENT, KID_COLOR_OPTIONS, EMOJI_CHOICES, type KidColor } from '../../lib/theme'
+import KidAvatar from '../KidAvatar'
 
-const EMOJI_CHOICES = ['🎁', '📱', '🎬', '🌙', '💵', '🍕', '🎮', '🛍️', '🍦', '🚲', '🎟️', '⏰']
-
-export default function RewardsTab() {
-  const { data, addReward, updateReward, removeReward } = useStore()
-  const [title, setTitle] = useState('')
+export default function KidsTab() {
+  const { data, addKid, updateKid, removeKid } = useStore()
+  const [name, setName] = useState('')
   const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
-  const [cost, setCost] = useState(20)
+  const [color, setColor] = useState<KidColor>(KID_COLOR_OPTIONS[0])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim()) return
-    addReward(title.trim(), emoji, cost)
-    setTitle('')
-    setCost(20)
+    if (!name.trim()) return
+    addKid(name.trim(), emoji, color)
+    setName('')
   }
 
   return (
     <div className="space-y-8">
       <form onSubmit={submit} className="glass rounded-2xl p-5">
-        <h2 className="font-display text-lg font-bold">Add a reward</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-xs text-white/50">Reward title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 30 min extra screen time"
-              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs text-white/50">Cost (points)</label>
-            <input
-              type="number"
-              min={1}
-              value={cost}
-              onChange={(e) => setCost(Number(e.target.value))}
-              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
-            />
-          </div>
+        <h2 className="font-display text-lg font-bold">Add a kid profile</h2>
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Kid's name"
+            className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
+          />
         </div>
         <div className="mt-4">
-          <label className="mb-1.5 block text-xs text-white/50">Icon</label>
+          <label className="mb-1.5 block text-xs text-white/50">Avatar</label>
           <div className="flex flex-wrap gap-2">
             {EMOJI_CHOICES.map((e) => (
               <button
@@ -60,48 +47,53 @@ export default function RewardsTab() {
             ))}
           </div>
         </div>
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Color</label>
+          <div className="flex flex-wrap gap-2">
+            {KID_COLOR_OPTIONS.map((c) => (
+              <button
+                type="button"
+                key={c}
+                onClick={() => setColor(c)}
+                className={`h-9 w-9 rounded-full bg-gradient-to-br ${GRADIENT[c]} transition ${
+                  color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0a0a12]' : 'opacity-70 hover:opacity-100'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
         <button
           type="submit"
           className="mt-5 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
         >
-          <Plus size={15} /> Add reward
+          <Plus size={15} /> Add kid
         </button>
       </form>
 
       <section>
-        <h2 className="font-display text-lg font-bold">All rewards</h2>
+        <h2 className="font-display text-lg font-bold">All kids</h2>
         <div className="mt-4 space-y-2">
-          {data.rewards.map((reward) => (
-            <div key={reward.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
+          {data.kids.map((kid) => (
+            <div key={kid.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
               <div className="flex items-center gap-3">
-                <span className="text-xl">{reward.emoji}</span>
+                <KidAvatar kid={kid} className="h-10 w-10 text-lg" />
                 <div>
-                  <div className="text-sm font-medium">{reward.title}</div>
-                  <div className="text-xs text-white/40">{reward.cost} pts</div>
+                  <input
+                    value={kid.name}
+                    onChange={(e) => updateKid(kid.id, { name: e.target.value })}
+                    className="rounded-lg bg-transparent px-1 py-0.5 text-sm font-medium outline-none focus:bg-white/10"
+                  />
+                  <div className="px-1 text-xs text-white/40">{kid.points} pts &middot; {kid.totalEarned} lifetime</div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-white/50">
-                  <input
-                    type="checkbox"
-                    checked={reward.active}
-                    onChange={(e) => updateReward(reward.id, { active: e.target.checked })}
-                    className="accent-fuchsia-500"
-                  />
-                  Active
-                </label>
-                <button
-                  onClick={() => removeReward(reward.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/50 hover:bg-rose-500/20 hover:text-rose-300"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+              <button
+                onClick={() => removeKid(kid.id)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/50 hover:bg-rose-500/20 hover:text-rose-300"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
-          {data.rewards.length === 0 && (
-            <div className="glass rounded-2xl p-6 text-center text-white/40">No rewards yet.</div>
-          )}
         </div>
       </section>
     </div>

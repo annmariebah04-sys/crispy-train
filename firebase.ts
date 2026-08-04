@@ -1,29 +1,109 @@
-import { initializeApp } from 'firebase/app'
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
+import { useState } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { useStore } from '../../lib/store'
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-}
+const EMOJI_CHOICES = ['🎁', '📱', '🎬', '🌙', '💵', '🍕', '🎮', '🛍️', '🍦', '🚲', '🎟️', '⏰']
 
-// A private, hard-to-guess namespace so this family's data lives at its own
-// path in Firestore. Not a substitute for real auth, but keeps one family's
-// chores separate from anyone else who might reuse the same Firebase project.
-export const familyId: string = import.meta.env.VITE_FAMILY_ID || 'default-family'
+export default function RewardsTab() {
+  const { data, addReward, updateReward, removeReward } = useStore()
+  const [title, setTitle] = useState('')
+  const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
+  const [cost, setCost] = useState(20)
 
-export const missingFirebaseConfig = Object.entries(firebaseConfig)
-  .filter(([, v]) => !v)
-  .map(([k]) => k)
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) return
+    addReward(title.trim(), emoji, cost)
+    setTitle('')
+    setCost(20)
+  }
 
-const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+  return (
+    <div className="space-y-8">
+      <form onSubmit={submit} className="glass rounded-2xl p-5">
+        <h2 className="font-display text-lg font-bold">Add a reward</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Reward title</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. 30 min extra screen time"
+              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Cost (points)</label>
+            <input
+              type="number"
+              min={1}
+              value={cost}
+              onChange={(e) => setCost(Number(e.target.value))}
+              className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
+            />
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Icon</label>
+          <div className="flex flex-wrap gap-2">
+            {EMOJI_CHOICES.map((e) => (
+              <button
+                type="button"
+                key={e}
+                onClick={() => setEmoji(e)}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition ${
+                  emoji === e ? 'bg-fuchsia-500/30 ring-2 ring-fuchsia-400' : 'bg-white/5 hover:bg-white/10'
+                }`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          type="submit"
+          className="mt-5 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
+        >
+          <Plus size={15} /> Add reward
+        </button>
+      </form>
 
-// For local development against `firebase emulators:start` — never used in
-// a deployed build.
-if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
-  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+      <section>
+        <h2 className="font-display text-lg font-bold">All rewards</h2>
+        <div className="mt-4 space-y-2">
+          {data.rewards.map((reward) => (
+            <div key={reward.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">{reward.emoji}</span>
+                <div>
+                  <div className="text-sm font-medium">{reward.title}</div>
+                  <div className="text-xs text-white/40">{reward.cost} pts</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-white/50">
+                  <input
+                    type="checkbox"
+                    checked={reward.active}
+                    onChange={(e) => updateReward(reward.id, { active: e.target.checked })}
+                    className="accent-fuchsia-500"
+                  />
+                  Active
+                </label>
+                <button
+                  onClick={() => removeReward(reward.id)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/50 hover:bg-rose-500/20 hover:text-rose-300"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {data.rewards.length === 0 && (
+            <div className="glass rounded-2xl p-6 text-center text-white/40">No rewards yet.</div>
+          )}
+        </div>
+      </section>
+    </div>
+  )
 }

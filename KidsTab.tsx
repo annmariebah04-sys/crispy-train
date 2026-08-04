@@ -1,101 +1,185 @@
-import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Sparkles, Gift, Clock3, Pencil } from 'lucide-react'
 import { useStore } from '../../lib/store'
-import { GRADIENT, KID_COLOR_OPTIONS, EMOJI_CHOICES, type KidColor } from '../../lib/theme'
+import { GRADIENT, TEXT } from '../../lib/theme'
+import { getWeekdayForDayKey } from '../../lib/dates'
+import ChoreCard from './ChoreCard'
+import RewardCard from './RewardCard'
+import CountdownPill from '../CountdownPill'
+import AvatarPicker from './AvatarPicker'
 import KidAvatar from '../KidAvatar'
 
-export default function KidsTab() {
-  const { data, addKid, updateKid, removeKid } = useStore()
-  const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
-  const [color, setColor] = useState<KidColor>(KID_COLOR_OPTIONS[0])
+interface Props {
+  kidId: string
+  onBack: () => void
+}
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!name.trim()) return
-    addKid(name.trim(), emoji, color)
-    setName('')
+export default function KidHome({ kidId, onBack }: Props) {
+  const { data, today, toggleComplete, redeemReward, updateKid } = useStore()
+  const [toast, setToast] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const kid = data.kids.find((k) => k.id === kidId)
+  const weekday = getWeekdayForDayKey(today)
+
+  const chores = useMemo(
+    () =>
+      data.chores.filter(
+        (c) => c.kidId === kidId && c.active && (c.days.length === 0 || c.days.includes(weekday)),
+      ),
+    [data.chores, kidId, weekday],
+  )
+
+  const completions = useMemo(
+    () => new Set(data.completions.filter((c) => c.kidId === kidId && c.dayKey === today).map((c) => c.choreId)),
+    [data.completions, kidId, today],
+  )
+
+  const doneCount = chores.filter((c) => completions.has(c.id)).length
+  const progress = chores.length ? Math.round((doneCount / chores.length) * 100) : 0
+
+  const myRedemptions = data.redemptions
+    .filter((r) => r.kidId === kidId && !r.fulfilled)
+    .sort((a, b) => b.requestedAt - a.requestedAt)
+
+  if (!kid) return null
+
+  async function handleRedeem(rewardId: string, title: string) {
+    const ok = await redeemReward(kidId, rewardId)
+    setToast(ok ? `${title} unlocked! Ask a parent to claim it.` : 'Not enough points yet.')
+    setTimeout(() => setToast(null), 2600)
   }
 
   return (
-    <div className="space-y-8">
-      <form onSubmit={submit} className="glass rounded-2xl p-5">
-        <h2 className="font-display text-lg font-bold">Add a kid profile</h2>
-        <div className="mt-4">
-          <label className="mb-1.5 block text-xs text-white/50">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Kid's name"
-            className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
-          />
+    <div className="relative min-h-screen">
+      {kid.background && (
+        <div className="fixed inset-0 -z-10">
+          <img src={kid.background} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-black/65" />
         </div>
-        <div className="mt-4">
-          <label className="mb-1.5 block text-xs text-white/50">Avatar</label>
-          <div className="flex flex-wrap gap-2">
-            {EMOJI_CHOICES.map((e) => (
-              <button
-                type="button"
-                key={e}
-                onClick={() => setEmoji(e)}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition ${
-                  emoji === e ? 'bg-fuchsia-500/30 ring-2 ring-fuchsia-400' : 'bg-white/5 hover:bg-white/10'
-                }`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4">
-          <label className="mb-1.5 block text-xs text-white/50">Color</label>
-          <div className="flex flex-wrap gap-2">
-            {KID_COLOR_OPTIONS.map((c) => (
-              <button
-                type="button"
-                key={c}
-                onClick={() => setColor(c)}
-                className={`h-9 w-9 rounded-full bg-gradient-to-br ${GRADIENT[c]} transition ${
-                  color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0a0a12]' : 'opacity-70 hover:opacity-100'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-        <button
-          type="submit"
-          className="mt-5 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
-        >
-          <Plus size={15} /> Add kid
-        </button>
-      </form>
+      )}
 
-      <section>
-        <h2 className="font-display text-lg font-bold">All kids</h2>
-        <div className="mt-4 space-y-2">
-          {data.kids.map((kid) => (
-            <div key={kid.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
-              <div className="flex items-center gap-3">
-                <KidAvatar kid={kid} className="h-10 w-10 text-lg" />
-                <div>
-                  <input
-                    value={kid.name}
-                    onChange={(e) => updateKid(kid.id, { name: e.target.value })}
-                    className="rounded-lg bg-transparent px-1 py-0.5 text-sm font-medium outline-none focus:bg-white/10"
-                  />
-                  <div className="px-1 text-xs text-white/40">{kid.points} pts &middot; {kid.totalEarned} lifetime</div>
-                </div>
-              </div>
-              <button
-                onClick={() => removeKid(kid.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/50 hover:bg-rose-500/20 hover:text-rose-300"
-              >
-                <Trash2 size={14} />
-              </button>
+      <div className="mx-auto max-w-3xl px-6 py-8">
+        <header className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/70 hover:text-white"
+          >
+            <ArrowLeft size={14} /> Profiles
+          </button>
+          <CountdownPill />
+        </header>
+
+        <div className="mt-8 flex items-center gap-5">
+          <button onClick={() => setPickerOpen(true)} className="group relative" aria-label="Change your avatar">
+            <KidAvatar kid={kid} className="h-20 w-20 text-4xl" glow />
+            <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-white ring-2 ring-[#0a0a12] transition group-hover:bg-white/25">
+              <Pencil size={12} />
             </div>
-          ))}
+          </button>
+          <div>
+            <h1 className="font-display text-3xl font-bold">{kid.name}</h1>
+            <div className={`mt-1 flex items-center gap-1.5 text-sm font-semibold ${TEXT[kid.color]}`}>
+              <Sparkles size={14} /> {kid.points} points available
+            </div>
+          </div>
         </div>
-      </section>
+
+        <AvatarPicker
+          open={pickerOpen}
+          kid={kid}
+          onUpdate={(patch) => updateKid(kidId, patch)}
+          onClose={() => setPickerOpen(false)}
+        />
+
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold">Today's chores</h2>
+            <span className="text-sm text-white/40">
+              {doneCount}/{chores.length} done
+            </span>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className={`h-full rounded-full bg-gradient-to-r ${GRADIENT[kid.color]}`}
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <AnimatePresence>
+              {chores.map((chore) => (
+                <ChoreCard
+                  key={chore.id}
+                  chore={chore}
+                  done={completions.has(chore.id)}
+                  onToggle={() => toggleComplete(kidId, chore.id)}
+                />
+              ))}
+            </AnimatePresence>
+            {chores.length === 0 && (
+              <div className="glass rounded-2xl p-6 text-center text-white/50">
+                No chores assigned for today. Enjoy the break! 🎉
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+            <Gift size={18} className="text-fuchsia-400" /> Rewards shelf
+          </h2>
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {data.rewards
+              .filter((r) => r.active)
+              .map((reward) => (
+                <RewardCard
+                  key={reward.id}
+                  reward={reward}
+                  points={kid.points}
+                  onRedeem={() => handleRedeem(reward.id, reward.title)}
+                />
+              ))}
+          </div>
+        </section>
+
+        {myRedemptions.length > 0 && (
+          <section className="mt-10">
+            <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+              <Clock3 size={18} className="text-amber-400" /> Waiting on parent
+            </h2>
+            <div className="mt-4 space-y-2">
+              {myRedemptions.map((r) => {
+                const reward = data.rewards.find((rw) => rw.id === r.rewardId)
+                return (
+                  <div key={r.id} className="glass flex items-center justify-between rounded-xl px-4 py-3 text-sm">
+                    <span>
+                      {reward?.emoji} {reward?.title ?? 'Reward'}
+                    </span>
+                    <span className="text-white/40">Pending</span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="glass fixed bottom-6 left-1/2 -translate-x-1/2 rounded-full px-5 py-3 text-sm font-medium shadow-lg"
+            >
+              {toast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

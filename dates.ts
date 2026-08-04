@@ -1,47 +1,68 @@
-// Chores run on a daily cycle that ends at 12:00 PM (noon).
-// The "chore day" key is the calendar date on which the current cycle started.
-export const CYCLE_END_HOUR = 12
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { ArrowLeft, Lock } from 'lucide-react'
+import { useStore } from '../../lib/store'
 
-export function pad(n: number) {
-  return n.toString().padStart(2, '0')
+interface Props {
+  onSuccess: () => void
+  onBack: () => void
 }
 
-export function toDayKey(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
+export default function ParentGate({ onSuccess, onBack }: Props) {
+  const { data } = useStore()
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState(false)
 
-export function getChoreDayKey(now: Date = new Date()): string {
-  const d = new Date(now)
-  if (d.getHours() < CYCLE_END_HOUR) {
-    d.setDate(d.getDate() - 1)
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (pin === data.parentPin) {
+      onSuccess()
+    } else {
+      setError(true)
+      setPin('')
+      setTimeout(() => setError(false), 1500)
+    }
   }
-  d.setHours(0, 0, 0, 0)
-  return toDayKey(d)
-}
 
-export function getWeekdayForDayKey(dayKey: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
-  const [y, m, day] = dayKey.split('-').map(Number)
-  return new Date(y, m - 1, day).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
-}
+  return (
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6">
+      <button
+        onClick={onBack}
+        className="glass absolute left-6 top-8 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/70 hover:text-white"
+      >
+        <ArrowLeft size={14} /> Back
+      </button>
 
-// Next noon deadline for the current chore cycle
-export function getNextDeadline(now: Date = new Date()): Date {
-  const d = new Date(now)
-  d.setHours(CYCLE_END_HOUR, 0, 0, 0)
-  if (now.getHours() >= CYCLE_END_HOUR) {
-    d.setDate(d.getDate() + 1)
-  }
-  return d
-}
+      <div className="glass flex h-16 w-16 items-center justify-center rounded-full">
+        <Lock size={24} className="text-fuchsia-400" />
+      </div>
+      <h1 className="mt-5 font-display text-2xl font-bold">Parent Mode</h1>
+      <p className="mt-2 text-center text-sm text-white/50">Enter the parent PIN to manage chores &amp; rewards.</p>
 
-export function formatCountdown(now: Date = new Date()): string {
-  const deadline = getNextDeadline(now)
-  const diffMs = deadline.getTime() - now.getTime()
-  const totalMinutes = Math.max(0, Math.floor(diffMs / 60000))
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours <= 0) return `${minutes}m left`
-  return `${hours}h ${minutes}m left`
-}
+      <motion.form
+        onSubmit={submit}
+        animate={error ? { x: [0, -8, 8, -8, 0] } : {}}
+        className="mt-8 w-full"
+      >
+        <input
+          autoFocus
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="Enter PIN"
+          className="glass w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:text-white/30 focus:ring-2 focus:ring-fuchsia-400/60"
+        />
+        <button
+          type="submit"
+          className="mt-4 w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 py-3 font-semibold text-black transition hover:opacity-90"
+        >
+          Unlock
+        </button>
+        {error && <p className="mt-3 text-center text-sm text-rose-400">Incorrect PIN, try again.</p>}
+      </motion.form>
 
-export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      <p className="mt-6 text-xs text-white/30">Default PIN is 1234 &mdash; change it from the parent dashboard.</p>
+    </div>
+  )
+}

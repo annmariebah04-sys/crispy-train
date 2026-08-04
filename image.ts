@@ -1,69 +1,41 @@
-function loadImageFromFile(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read file'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('Could not load image'))
-      img.onload = () => resolve(img)
-      img.src = reader.result as string
-    }
-    reader.readAsDataURL(file)
-  })
-}
+import { useState } from 'react'
+import { useStore } from '../../lib/store'
 
-function dataUrlByteLength(dataUrl: string) {
-  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
-  return Math.ceil((base64.length * 3) / 4)
-}
+export default function SettingsTab() {
+  const { data, setParentPin } = useStore()
+  const [pin, setPin] = useState('')
+  const [saved, setSaved] = useState(false)
 
-// Kid profile docs live in a single Firestore document (1 MiB cap) alongside
-// a photo and a background, so each image gets its own conservative budget.
-const AVATAR_BUDGET_BYTES = 150_000
-const BACKGROUND_BUDGET_BYTES = 650_000
-
-function canvasToJpeg(canvas: HTMLCanvasElement, quality: number) {
-  return canvas.toDataURL('image/jpeg', quality)
-}
-
-// Reads an image file, center-crops it to a square, and downsizes it so
-// avatar photos stay well under Firestore's per-document size limit.
-export async function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
-  const img = await loadImageFromFile(file)
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas unsupported')
-  const scale = Math.max(size / img.width, size / img.height)
-  const w = img.width * scale
-  const h = img.height * scale
-  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
-
-  for (const quality of [0.8, 0.6, 0.4]) {
-    const url = canvasToJpeg(canvas, quality)
-    if (dataUrlByteLength(url) <= AVATAR_BUDGET_BYTES) return url
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (pin.length < 4) return
+    setParentPin(pin)
+    setPin('')
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
-  throw new Error('That photo is too detailed to shrink down enough — try a simpler one.')
-}
 
-// Reads an image file and downsizes it (preserving aspect ratio) for use as
-// a full-bleed background — no cropping, CSS `object-cover` handles framing.
-export async function fileToBackgroundDataUrl(file: File, maxDim = 1280): Promise<string> {
-  const img = await loadImageFromFile(file)
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
-  const w = Math.round(img.width * scale)
-  const h = Math.round(img.height * scale)
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas unsupported')
-  ctx.drawImage(img, 0, 0, w, h)
-
-  for (const quality of [0.72, 0.55, 0.4]) {
-    const url = canvasToJpeg(canvas, quality)
-    if (dataUrlByteLength(url) <= BACKGROUND_BUDGET_BYTES) return url
-  }
-  throw new Error('That image is too detailed to shrink down enough — try a simpler one.')
+  return (
+    <div className="glass max-w-sm rounded-2xl p-5">
+      <h2 className="font-display text-lg font-bold">Parent PIN</h2>
+      <p className="mt-1 text-sm text-white/50">Current PIN: {data.parentPin}</p>
+      <form onSubmit={submit} className="mt-4">
+        <label className="mb-1.5 block text-xs text-white/50">New PIN (4+ digits)</label>
+        <input
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
+        />
+        <button
+          type="submit"
+          className="mt-4 w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
+        >
+          Update PIN
+        </button>
+        {saved && <p className="mt-2 text-center text-sm text-emerald-400">PIN updated!</p>}
+      </form>
+    </div>
+  )
 }
