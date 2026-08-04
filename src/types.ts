@@ -12,14 +12,25 @@ export interface Kid {
   createdAt: number
 }
 
+// A chore is a household-wide pool item — it isn't tied to one kid. Which
+// kid does it on a given day comes from that day's Assignment instead.
 export interface Chore {
   id: string
-  kidId: string
   title: string
   emoji: string
   points: number
-  days: Weekday[] // which weekdays this chore is active; empty = every day
+  days: Weekday[] // which weekdays this chore is eligible; empty = every day
   active: boolean
+  createdAt: number
+}
+
+// The result of randomly handing out today's eligible chores across kids.
+// One doc per (dayKey, choreId), computed once per day.
+export interface Assignment {
+  id: string
+  dayKey: string
+  choreId: string
+  kidId: string
   createdAt: number
 }
 
@@ -28,6 +39,7 @@ export interface Completion {
   kidId: string
   choreId: string
   dayKey: string // which chore-cycle day this completion belongs to
+  photo: string // proof-of-completion photo, as a data URL
   completedAt: number
 }
 
@@ -53,6 +65,7 @@ export interface Redemption {
 export interface AppData {
   kids: Kid[]
   chores: Chore[]
+  assignments: Assignment[]
   completions: Completion[]
   rewards: Reward[]
   redemptions: Redemption[]

@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Sparkles, Gift, Clock3, Pencil } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { GRADIENT, TEXT } from '../../lib/theme'
-import { getWeekdayForDayKey } from '../../lib/dates'
 import ChoreCard from './ChoreCard'
 import RewardCard from './RewardCard'
 import CountdownPill from '../CountdownPill'
 import AvatarPicker from './AvatarPicker'
 import KidAvatar from '../KidAvatar'
+import type { Chore } from '../../types'
 
 interface Props {
   kidId: string
@@ -16,23 +16,24 @@ interface Props {
 }
 
 export default function KidHome({ kidId, onBack }: Props) {
-  const { data, today, toggleComplete, redeemReward, updateKid } = useStore()
+  const { data, today, completeChore, redeemReward, updateKid } = useStore()
   const [toast, setToast] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const kid = data.kids.find((k) => k.id === kidId)
-  const weekday = getWeekdayForDayKey(today)
 
-  const chores = useMemo(
-    () =>
-      data.chores.filter(
-        (c) => c.kidId === kidId && c.active && (c.days.length === 0 || c.days.includes(weekday)),
-      ),
-    [data.chores, kidId, weekday],
-  )
+  const chores = useMemo(() => {
+    const choreIds = data.assignments.filter((a) => a.kidId === kidId).map((a) => a.choreId)
+    return choreIds
+      .map((id) => data.chores.find((c) => c.id === id))
+      .filter((c): c is Chore => Boolean(c))
+  }, [data.assignments, data.chores, kidId])
 
   const completions = useMemo(
-    () => new Set(data.completions.filter((c) => c.kidId === kidId && c.dayKey === today).map((c) => c.choreId)),
+    () =>
+      new Map(
+        data.completions.filter((c) => c.kidId === kidId && c.dayKey === today).map((c) => [c.choreId, c]),
+      ),
     [data.completions, kidId, today],
   )
 
@@ -115,8 +116,8 @@ export default function KidHome({ kidId, onBack }: Props) {
                 <ChoreCard
                   key={chore.id}
                   chore={chore}
-                  done={completions.has(chore.id)}
-                  onToggle={() => toggleComplete(kidId, chore.id)}
+                  completion={completions.get(chore.id)}
+                  onComplete={(photo) => completeChore(kidId, chore.id, photo)}
                 />
               ))}
             </AnimatePresence>

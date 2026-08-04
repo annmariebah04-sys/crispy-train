@@ -24,6 +24,13 @@ export function getWeekdayForDayKey(dayKey: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   return new Date(y, m - 1, day).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6
 }
 
+export function getPreviousDayKey(dayKey: string): string {
+  const [y, m, day] = dayKey.split('-').map(Number)
+  const d = new Date(y, m - 1, day)
+  d.setDate(d.getDate() - 1)
+  return toDayKey(d)
+}
+
 // Next noon deadline for the current chore cycle
 export function getNextDeadline(now: Date = new Date()): Date {
   const d = new Date(now)

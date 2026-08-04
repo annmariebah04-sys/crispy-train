@@ -5,10 +5,11 @@ A sleek, dark-mode chores & rewards app for 3 kids. Built with React, TypeScript
 ## Features
 
 - **Kid profiles** — pick an avatar (emoji or an uploaded photo), a background image, a color, and a name for each of the 3 kids.
-- **Daily chores** — parents assign chores per kid, optionally restricted to specific weekdays (or every day).
-- **Noon reset** — the chore day runs on a cycle that ends at **12:00 PM**. A countdown pill shows time left; at noon the board resets for the next cycle.
-- **Points & rewards** — completing a chore instantly awards points. Kids can unlock parent-defined rewards once they have enough points; redemption requests wait for parent approval in the dashboard.
-- **Parent dashboard** (PIN-gated, default `1234`) — add/edit chores and rewards, verify or undo a kid's chore completions, approve/cancel reward requests, manage kid profiles, and change the PIN.
+- **Randomized daily chores** — parents build a shared pool of household chores (wash dishes, sweep, empty the dishwasher, etc.). Every day, the app randomly hands them out across the kids, making sure nobody gets the exact chore they had the day before.
+- **Noon reset** — the chore day runs on a cycle that ends at **12:00 PM**. A countdown pill shows time left; at noon the board resets and a new day's chores get assigned.
+- **Photo proof** — to mark a chore done, a kid attaches a photo (camera or library); the completion time is stamped on automatically and visible to the parent.
+- **Points & rewards** — completing a chore awards points on the spot. Kids can unlock parent-defined rewards once they have enough points; redemption requests wait for parent approval in the dashboard.
+- **Parent dashboard** (PIN-gated, default `1234`) — manage the chore pool and rewards, review each kid's proof photos and undo a completion if needed, approve/cancel reward requests, manage kid profiles, and change the PIN.
 - **Real-time sync** — every device (parent's phone, each kid's phone/tablet) reads and writes the same shared Firestore data, live.
 
 ## One-time setup: Firebase

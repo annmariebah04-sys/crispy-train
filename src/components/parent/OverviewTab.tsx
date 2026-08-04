@@ -1,12 +1,14 @@
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Gift, X } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { TEXT } from '../../lib/theme'
-import { getWeekdayForDayKey } from '../../lib/dates'
 import KidAvatar from '../KidAvatar'
+import type { Completion } from '../../types'
 
 export default function OverviewTab() {
-  const { data, today, toggleComplete, fulfillRedemption, cancelRedemption } = useStore()
-  const weekday = getWeekdayForDayKey(today)
+  const { data, today, uncompleteChore, fulfillRedemption, cancelRedemption } = useStore()
+  const [viewing, setViewing] = useState<Completion | null>(null)
 
   const pendingRedemptions = data.redemptions
     .filter((r) => !r.fulfilled)
@@ -61,11 +63,12 @@ export default function OverviewTab() {
         <h2 className="font-display text-lg font-bold">Today's progress</h2>
         <div className="mt-4 grid gap-5 sm:grid-cols-3">
           {data.kids.map((kid) => {
-            const chores = data.chores.filter(
-              (c) => c.kidId === kid.id && c.active && (c.days.length === 0 || c.days.includes(weekday)),
-            )
-            const doneIds = new Set(
-              data.completions.filter((c) => c.kidId === kid.id && c.dayKey === today).map((c) => c.choreId),
+            const choreIds = data.assignments.filter((a) => a.kidId === kid.id).map((a) => a.choreId)
+            const chores = choreIds
+              .map((id) => data.chores.find((c) => c.id === id))
+              .filter((c): c is NonNullable<typeof c> => Boolean(c))
+            const completionByChore = new Map(
+              data.completions.filter((c) => c.kidId === kid.id && c.dayKey === today).map((c) => [c.choreId, c]),
             )
             return (
               <div key={kid.id} className="glass rounded-2xl p-5">
@@ -79,24 +82,41 @@ export default function OverviewTab() {
                 <div className="mt-4 space-y-2">
                   {chores.length === 0 && <div className="text-sm text-white/40">No chores today</div>}
                   {chores.map((chore) => {
-                    const done = doneIds.has(chore.id)
+                    const completion = completionByChore.get(chore.id)
                     return (
-                      <button
-                        key={chore.id}
-                        onClick={() => toggleComplete(kid.id, chore.id)}
-                        className="flex w-full items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
-                      >
-                        <span className={done ? 'text-white/40 line-through' : ''}>
-                          {chore.emoji} {chore.title}
-                        </span>
-                        <span
-                          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                            done ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300' : 'border-white/25 text-transparent'
-                          }`}
-                        >
-                          <Check size={11} strokeWidth={3} />
-                        </span>
-                      </button>
+                      <div key={chore.id} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm">
+                        {completion ? (
+                          <button
+                            onClick={() => setViewing(completion)}
+                            className="h-9 w-9 shrink-0 overflow-hidden rounded-md ring-1 ring-white/10"
+                          >
+                            <img src={completion.photo} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ) : (
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/5 text-base">
+                            {chore.emoji}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className={completion ? 'truncate text-white/40 line-through' : 'truncate'}>{chore.title}</div>
+                          {completion && (
+                            <div className="text-[10px] text-white/30">
+                              {new Date(completion.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          )}
+                        </div>
+                        {completion ? (
+                          <button
+                            onClick={() => uncompleteChore(kid.id, chore.id)}
+                            title="Undo completion"
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/50 hover:text-white"
+                          >
+                            <X size={11} />
+                          </button>
+                        ) : (
+                          <span className="shrink-0 text-xs text-white/30">Pending</span>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
@@ -105,6 +125,39 @@ export default function OverviewTab() {
           })}
         </div>
       </section>
+
+      <AnimatePresence>
+        {viewing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6"
+            onClick={() => setViewing(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass w-full max-w-sm overflow-hidden rounded-3xl"
+            >
+              <img src={viewing.photo} alt="" className="max-h-[70vh] w-full object-cover" />
+              <div className="flex items-center justify-between p-4">
+                <div className="text-xs text-white/40">
+                  Completed {new Date(viewing.completedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                </div>
+                <button
+                  onClick={() => setViewing(null)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/60 hover:text-white"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

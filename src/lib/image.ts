@@ -21,6 +21,7 @@ function dataUrlByteLength(dataUrl: string) {
 // a photo and a background, so each image gets its own conservative budget.
 const AVATAR_BUDGET_BYTES = 150_000
 const BACKGROUND_BUDGET_BYTES = 650_000
+const PROOF_PHOTO_BUDGET_BYTES = 250_000
 
 function canvasToJpeg(canvas: HTMLCanvasElement, quality: number) {
   return canvas.toDataURL('image/jpeg', quality)
@@ -66,4 +67,25 @@ export async function fileToBackgroundDataUrl(file: File, maxDim = 1280): Promis
     if (dataUrlByteLength(url) <= BACKGROUND_BUDGET_BYTES) return url
   }
   throw new Error('That image is too detailed to shrink down enough — try a simpler one.')
+}
+
+// Reads an image file and downsizes it (preserving aspect ratio) for use as
+// a chore-completion proof photo.
+export async function fileToProofPhotoDataUrl(file: File, maxDim = 900): Promise<string> {
+  const img = await loadImageFromFile(file)
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+  const w = Math.round(img.width * scale)
+  const h = Math.round(img.height * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas unsupported')
+  ctx.drawImage(img, 0, 0, w, h)
+
+  for (const quality of [0.75, 0.6, 0.45]) {
+    const url = canvasToJpeg(canvas, quality)
+    if (dataUrlByteLength(url) <= PROOF_PHOTO_BUDGET_BYTES) return url
+  }
+  throw new Error('That photo is too detailed to shrink down enough — try a simpler one.')
 }
