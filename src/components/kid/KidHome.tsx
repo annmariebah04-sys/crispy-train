@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Sparkles, Gift, Clock3, Pencil } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { GRADIENT, TEXT } from '../../lib/theme'
+import { fileToProofPhotoDataUrl } from '../../lib/image'
+import { uploadProofVideo } from '../../lib/storage'
 import ChoreCard from './ChoreCard'
 import RewardCard from './RewardCard'
 import CountdownPill from '../CountdownPill'
@@ -16,7 +18,7 @@ interface Props {
 }
 
 export default function KidHome({ kidId, onBack }: Props) {
-  const { data, today, completeChore, redeemReward, updateKid } = useStore()
+  const { data, today, submitCompletion, redeemReward, updateKid } = useStore()
   const [toast, setToast] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -37,7 +39,8 @@ export default function KidHome({ kidId, onBack }: Props) {
     [data.completions, kidId, today],
   )
 
-  const doneCount = chores.filter((c) => completions.has(c.id)).length
+  const doneCount = chores.filter((c) => completions.get(c.id)?.status === 'approved').length
+  const pendingCount = chores.filter((c) => completions.get(c.id)?.status === 'pending').length
   const progress = chores.length ? Math.round((doneCount / chores.length) * 100) : 0
 
   const myRedemptions = data.redemptions
@@ -50,6 +53,12 @@ export default function KidHome({ kidId, onBack }: Props) {
     const ok = await redeemReward(kidId, rewardId)
     setToast(ok ? `${title} unlocked! Ask a parent to claim it.` : 'Not enough points yet.')
     setTimeout(() => setToast(null), 2600)
+  }
+
+  async function handleSubmitProof(choreId: string, input: { photoFile?: File; videoFile?: File; note?: string }) {
+    const photo = input.photoFile ? await fileToProofPhotoDataUrl(input.photoFile) : undefined
+    const video = input.videoFile ? await uploadProofVideo(input.videoFile, kidId, choreId, today) : undefined
+    await submitCompletion(kidId, choreId, { photo, video, note: input.note })
   }
 
   return (
@@ -99,6 +108,7 @@ export default function KidHome({ kidId, onBack }: Props) {
             <h2 className="font-display text-lg font-bold">Today's chores</h2>
             <span className="text-sm text-white/40">
               {doneCount}/{chores.length} done
+              {pendingCount > 0 && <span className="text-amber-300"> &middot; {pendingCount} waiting on parent</span>}
             </span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -117,7 +127,7 @@ export default function KidHome({ kidId, onBack }: Props) {
                   key={chore.id}
                   chore={chore}
                   completion={completions.get(chore.id)}
-                  onComplete={(photo) => completeChore(kidId, chore.id, photo)}
+                  onSubmit={(input) => handleSubmitProof(chore.id, input)}
                 />
               ))}
             </AnimatePresence>

@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -121,12 +122,18 @@ async function ensureAssignedForToday(dayKey: string, chores: Chore[], kids: Kid
   const kidLoad = new Map(kids.map((k) => [k.id, 0]))
   const plan: Array<{ choreId: string; kidId: string }> = []
   for (const chore of shuffled(eligible)) {
-    const forbiddenKidId = lastKidForChore.get(chore.id)
-    const candidates = kids.filter((k) => k.id !== forbiddenKidId)
-    const pool = candidates.length > 0 ? candidates : kids
-    const minLoad = Math.min(...pool.map((k) => kidLoad.get(k.id)!))
-    const leastLoaded = pool.filter((k) => kidLoad.get(k.id) === minLoad)
-    const chosen = leastLoaded[Math.floor(Math.random() * leastLoaded.length)]
+    let chosen: Kid
+    const pinned = chore.assignedKidId ? kids.find((k) => k.id === chore.assignedKidId) : undefined
+    if (pinned) {
+      chosen = pinned
+    } else {
+      const forbiddenKidId = lastKidForChore.get(chore.id)
+      const candidates = kids.filter((k) => k.id !== forbiddenKidId)
+      const pool = candidates.length > 0 ? candidates : kids
+      const minLoad = Math.min(...pool.map((k) => kidLoad.get(k.id)!))
+      const leastLoaded = pool.filter((k) => kidLoad.get(k.id) === minLoad)
+      chosen = leastLoaded[Math.floor(Math.random() * leastLoaded.length)]
+    }
     kidLoad.set(chosen.id, kidLoad.get(chosen.id)! + 1)
     plan.push({ choreId: chore.id, kidId: chosen.id })
   }
@@ -152,11 +159,17 @@ interface StoreApi {
   addKid: (name: string, emoji: string, color: string) => Promise<void>
   updateKid: (id: string, patch: Partial<Pick<Kid, 'name' | 'emoji' | 'color' | 'photo' | 'background'>>) => Promise<void>
   removeKid: (id: string) => Promise<void>
-  addChore: (title: string, emoji: string, points: number, days: Weekday[]) => Promise<void>
-  updateChore: (id: string, patch: Partial<Pick<Chore, 'title' | 'emoji' | 'points' | 'days' | 'active'>>) => Promise<void>
+  addChore: (title: string, emoji: string, points: number, days: Weekday[], assignedKidId?: string) => Promise<void>
+  updateChore: (
+    id: string,
+    patch: Partial<Pick<Chore, 'title' | 'emoji' | 'points' | 'days' | 'active' | 'assignedKidId'>>,
+  ) => Promise<void>
   removeChore: (id: string) => Promise<void>
-  completeChore: (kidId: string, choreId: string, photo: string) => Promise<void>
-  uncompleteChore: (kidId: string, choreId: string) => Promise<void>
+  submitCompletion: (kidId: string, choreId: string, proof: { photo?: string; video?: string; note?: string }) => Promise<void>
+  approveCompletion: (id: string) => Promise<void>
+  rejectCompletion: (id: string, note?: string) => Promise<void>
+  undoCompletion: (id: string) => Promise<void>
+  loadHistory: (limitCount?: number) => Promise<Completion[]>
   addReward: (title: string, emoji: string, cost: number) => Promise<void>
   updateReward: (id: string, patch: Partial<Pick<Reward, 'title' | 'emoji' | 'cost' | 'active'>>) => Promise<void>
   removeReward: (id: string) => Promise<void>
@@ -173,6 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [chores, setChores] = useState<Chore[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [completions, setCompletions] = useState<Completion[]>([])
+  const [pendingCompletions, setPendingCompletions] = useState<Completion[]>([])
   const [rewards, setRewards] = useState<Reward[]>([])
   const [redemptions, setRedemptions] = useState<Redemption[]>([])
   const [parentPin, setParentPinLocal] = useState('1234')
@@ -209,6 +223,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setRedemptions(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Redemption))
         markLoaded('redemptions')
       }),
+      // Not day-scoped on purpose: a completion submitted late in one chore
+      // day can still be sitting unreviewed after the next day's rollover,
+      // and the parent's review queue needs to keep seeing it either way.
+      onSnapshot(query(completionsCol(), where('status', '==', 'pending')), (snap) => {
+        setPendingCompletions(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Completion))
+        markLoaded('pendingCompletions')
+      }),
     ]
     return () => unsubs.forEach((u) => u())
   }, [])
@@ -237,10 +258,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const data: AppData = useMemo(
-    () => ({ kids, chores, assignments, completions, rewards, redemptions, parentPin }),
-    [kids, chores, assignments, completions, rewards, redemptions, parentPin],
+    () => ({ kids, chores, assignments, completions, pendingCompletions, rewards, redemptions, parentPin }),
+    [kids, chores, assignments, completions, pendingCompletions, rewards, redemptions, parentPin],
   )
-  const loading = loadedKeys.size < 7
+  const loading = loadedKeys.size < 8
 
   useEffect(() => {
     if (loading || chores.length === 0 || kids.length === 0) return
@@ -269,8 +290,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         await batch.commit()
       },
-      async addChore(title, emoji, points, days) {
-        await addDoc(choresCol(), { title, emoji, points, days, active: true, createdAt: Date.now() })
+      async addChore(title, emoji, points, days, assignedKidId) {
+        await addDoc(choresCol(), {
+          title,
+          emoji,
+          points,
+          days,
+          active: true,
+          createdAt: Date.now(),
+          ...(assignedKidId ? { assignedKidId } : {}),
+        })
       },
       async updateChore(id, patch) {
         await updateDoc(doc(choresCol(), id), cleanPatch(patch))
@@ -284,39 +313,76 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         await batch.commit()
       },
-      async completeChore(kidId, choreId, photo) {
-        const chore = chores.find((c) => c.id === choreId)
-        if (!chore) return
+      async submitCompletion(kidId, choreId, proof) {
         const dayKey = getChoreDayKey()
         const compRef = doc(completionsCol(), `${kidId}_${choreId}_${dayKey}`)
-        const kidRef = doc(kidsCol(), kidId)
         await runTransaction(db, async (tx) => {
-          const [compSnap, kidSnap] = await Promise.all([tx.get(compRef), tx.get(kidRef)])
-          if (compSnap.exists() || !kidSnap.exists()) return
+          const snap = await tx.get(compRef)
+          // Once approved, a completion is locked — resubmitting shouldn't be
+          // able to knock it back into "pending" and hide it from the kid.
+          if (snap.exists() && (snap.data() as Completion).status === 'approved') return
+          tx.set(compRef, {
+            kidId,
+            choreId,
+            dayKey,
+            status: 'pending',
+            submittedAt: Date.now(),
+            ...(proof.photo !== undefined ? { photo: proof.photo } : {}),
+            ...(proof.video !== undefined ? { video: proof.video } : {}),
+            ...(proof.note !== undefined ? { note: proof.note } : {}),
+          })
+        })
+      },
+      async approveCompletion(id) {
+        const compRef = doc(completionsCol(), id)
+        await runTransaction(db, async (tx) => {
+          const compSnap = await tx.get(compRef)
+          if (!compSnap.exists()) return
+          const comp = compSnap.data() as Completion
+          if (comp.status !== 'pending') return
+          const chore = chores.find((c) => c.id === comp.choreId)
+          if (!chore) return
+          const kidRef = doc(kidsCol(), comp.kidId)
+          const kidSnap = await tx.get(kidRef)
+          if (!kidSnap.exists()) return
           const kidData = kidSnap.data() as Kid
-          tx.set(compRef, { kidId, choreId, dayKey, photo, completedAt: Date.now() })
+          tx.update(compRef, { status: 'approved', approvedAt: Date.now(), reviewedAt: Date.now() })
           tx.update(kidRef, {
             points: kidData.points + chore.points,
             totalEarned: kidData.totalEarned + chore.points,
           })
         })
       },
-      async uncompleteChore(kidId, choreId) {
-        const chore = chores.find((c) => c.id === choreId)
-        if (!chore) return
-        const dayKey = getChoreDayKey()
-        const compRef = doc(completionsCol(), `${kidId}_${choreId}_${dayKey}`)
-        const kidRef = doc(kidsCol(), kidId)
+      async rejectCompletion(id, note) {
+        await updateDoc(
+          doc(completionsCol(), id),
+          cleanPatch({ status: 'rejected', reviewedAt: Date.now(), rejectionNote: note }),
+        )
+      },
+      async undoCompletion(id) {
+        const compRef = doc(completionsCol(), id)
         await runTransaction(db, async (tx) => {
-          const [compSnap, kidSnap] = await Promise.all([tx.get(compRef), tx.get(kidRef)])
-          if (!compSnap.exists() || !kidSnap.exists()) return
-          const kidData = kidSnap.data() as Kid
+          const compSnap = await tx.get(compRef)
+          if (!compSnap.exists()) return
+          const comp = compSnap.data() as Completion
+          if (comp.status === 'approved') {
+            const chore = chores.find((c) => c.id === comp.choreId)
+            const kidRef = doc(kidsCol(), comp.kidId)
+            const kidSnap = await tx.get(kidRef)
+            if (chore && kidSnap.exists()) {
+              const kidData = kidSnap.data() as Kid
+              tx.update(kidRef, {
+                points: Math.max(0, kidData.points - chore.points),
+                totalEarned: Math.max(0, kidData.totalEarned - chore.points),
+              })
+            }
+          }
           tx.delete(compRef)
-          tx.update(kidRef, {
-            points: Math.max(0, kidData.points - chore.points),
-            totalEarned: Math.max(0, kidData.totalEarned - chore.points),
-          })
         })
+      },
+      async loadHistory(limitCount = 200) {
+        const snap = await getDocs(query(completionsCol(), orderBy('submittedAt', 'desc'), limit(limitCount)))
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Completion)
       },
       async addReward(title, emoji, cost) {
         await addDoc(rewardsCol(), { title, emoji, cost, active: true, createdAt: Date.now() })

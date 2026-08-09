@@ -12,6 +12,7 @@ export default function ChoresTab() {
   const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
   const [points, setPoints] = useState(10)
   const [days, setDays] = useState<Weekday[]>([])
+  const [assignedKidId, setAssignedKidId] = useState('')
 
   function toggleDay(d: Weekday) {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()))
@@ -20,10 +21,11 @@ export default function ChoresTab() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    addChore(title.trim(), emoji, points, days)
+    addChore(title.trim(), emoji, points, days, assignedKidId || undefined)
     setTitle('')
     setPoints(10)
     setDays([])
+    setAssignedKidId('')
   }
 
   return (
@@ -93,6 +95,25 @@ export default function ChoresTab() {
           </div>
         </div>
 
+        <div className="mt-4">
+          <label className="mb-1.5 block text-xs text-white/50">Assigned to</label>
+          <select
+            value={assignedKidId}
+            onChange={(e) => setAssignedKidId(e.target.value)}
+            className="w-full rounded-xl bg-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400/60"
+          >
+            <option value="">🎲 Random (recommended)</option>
+            {data.kids.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.emoji} Always {k.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-white/30">
+            Random spreads chores fairly and avoids repeats. Picking a kid means they always get this chore on its days.
+          </p>
+        </div>
+
         <button
           type="submit"
           className="mt-5 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
@@ -105,10 +126,11 @@ export default function ChoresTab() {
         <h2 className="font-display text-lg font-bold">Chore pool</h2>
         <div className="mt-4 space-y-2">
           {data.chores.map((chore) => {
+            const pinnedKid = chore.assignedKidId ? data.kids.find((k) => k.id === chore.assignedKidId) : undefined
             const todayAssignment = data.assignments.find((a) => a.choreId === chore.id)
-            const assignedKid = todayAssignment ? data.kids.find((k) => k.id === todayAssignment.kidId) : undefined
+            const todayKid = todayAssignment ? data.kids.find((k) => k.id === todayAssignment.kidId) : undefined
             return (
-              <div key={chore.id} className="glass flex items-center justify-between rounded-xl px-4 py-3">
+              <div key={chore.id} className="glass flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{chore.emoji}</span>
                   <div>
@@ -116,16 +138,35 @@ export default function ChoresTab() {
                     <div className="text-xs text-white/40">
                       {chore.points} pts &middot;{' '}
                       {chore.days.length === 0 ? 'Every day' : chore.days.map((d) => WEEKDAY_LABELS[d]).join(', ')}
-                      {assignedKid && (
+                      {pinnedKid ? (
                         <>
                           {' '}
-                          &middot; today: {assignedKid.emoji} {assignedKid.name}
+                          &middot; always: {pinnedKid.emoji} {pinnedKid.name}
                         </>
+                      ) : (
+                        todayKid && (
+                          <>
+                            {' '}
+                            &middot; today: {todayKid.emoji} {todayKid.name}
+                          </>
+                        )
                       )}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  <select
+                    value={chore.assignedKidId ?? ''}
+                    onChange={(e) => updateChore(chore.id, { assignedKidId: e.target.value || undefined })}
+                    className="rounded-lg bg-white/5 px-2 py-1.5 text-xs text-white/60 outline-none"
+                  >
+                    <option value="">🎲 Random</option>
+                    {data.kids.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        Always {k.name}
+                      </option>
+                    ))}
+                  </select>
                   <label className="flex items-center gap-1.5 text-xs text-white/50">
                     <input
                       type="checkbox"

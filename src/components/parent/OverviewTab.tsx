@@ -1,21 +1,75 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Gift, X } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { Check, Clock3, Gift, X } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { TEXT } from '../../lib/theme'
 import KidAvatar from '../KidAvatar'
+import ProofModal from '../ProofModal'
 import type { Completion } from '../../types'
 
 export default function OverviewTab() {
-  const { data, today, uncompleteChore, fulfillRedemption, cancelRedemption } = useStore()
+  const { data, today, approveCompletion, rejectCompletion, undoCompletion, fulfillRedemption, cancelRedemption } =
+    useStore()
   const [viewing, setViewing] = useState<Completion | null>(null)
 
   const pendingRedemptions = data.redemptions
     .filter((r) => !r.fulfilled)
     .sort((a, b) => a.requestedAt - b.requestedAt)
 
+  const pendingCompletions = [...data.pendingCompletions].sort((a, b) => a.submittedAt - b.submittedAt)
+
   return (
     <div className="space-y-8">
+      {pendingCompletions.length > 0 && (
+        <section>
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+            <Clock3 size={18} className="text-amber-400" /> Needs your review
+          </h2>
+          <div className="mt-4 space-y-2">
+            {pendingCompletions.map((c) => {
+              const kid = data.kids.find((k) => k.id === c.kidId)
+              const chore = data.chores.find((ch) => ch.id === c.choreId)
+              return (
+                <div key={c.id} className="glass flex items-center justify-between gap-3 rounded-xl px-4 py-3">
+                  <button onClick={() => setViewing(c)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    {c.photo ? (
+                      <img src={c.photo} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/5 text-lg">
+                        {c.video ? '🎥' : c.note ? '📝' : chore?.emoji}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{chore?.title ?? 'Chore'}</div>
+                      <div className="truncate text-xs text-white/40">
+                        {kid?.emoji} {kid?.name} &middot; +{chore?.points ?? 0} pts &middot;{' '}
+                        {new Date(c.submittedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={() => rejectCompletion(c.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-rose-500/20 hover:text-rose-300"
+                      title="Reject — kid can try again"
+                    >
+                      <X size={14} />
+                    </button>
+                    <button
+                      onClick={() => approveCompletion(c.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300 hover:bg-emerald-400/30"
+                      title="Approve & award points"
+                    >
+                      <Check size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {pendingRedemptions.length > 0 && (
         <section>
           <h2 className="flex items-center gap-2 font-display text-lg font-bold">
@@ -83,6 +137,7 @@ export default function OverviewTab() {
                   {chores.length === 0 && <div className="text-sm text-white/40">No chores today</div>}
                   {chores.map((chore) => {
                     const completion = completionByChore.get(chore.id)
+                    const approved = completion?.status === 'approved'
                     return (
                       <div key={chore.id} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm">
                         {completion ? (
@@ -90,7 +145,13 @@ export default function OverviewTab() {
                             onClick={() => setViewing(completion)}
                             className="h-9 w-9 shrink-0 overflow-hidden rounded-md ring-1 ring-white/10"
                           >
-                            <img src={completion.photo} alt="" className="h-full w-full object-cover" />
+                            {completion.photo ? (
+                              <img src={completion.photo} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center bg-white/5 text-base">
+                                {completion.video ? '🎥' : '📝'}
+                              </span>
+                            )}
                           </button>
                         ) : (
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/5 text-base">
@@ -98,23 +159,40 @@ export default function OverviewTab() {
                           </span>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className={completion ? 'truncate text-white/40 line-through' : 'truncate'}>{chore.title}</div>
+                          <div className={approved ? 'truncate text-white/40 line-through' : 'truncate'}>{chore.title}</div>
                           {completion && (
-                            <div className="text-[10px] text-white/30">
-                              {new Date(completion.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            <div
+                              className={`text-[10px] ${
+                                completion.status === 'pending'
+                                  ? 'text-amber-300'
+                                  : completion.status === 'rejected'
+                                    ? 'text-rose-300'
+                                    : 'text-white/30'
+                              }`}
+                            >
+                              {completion.status === 'pending'
+                                ? 'Waiting for review'
+                                : completion.status === 'rejected'
+                                  ? 'Rejected'
+                                  : new Date(completion.approvedAt ?? completion.submittedAt).toLocaleTimeString([], {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                    })}
                             </div>
                           )}
                         </div>
-                        {completion ? (
+                        {approved ? (
                           <button
-                            onClick={() => uncompleteChore(kid.id, chore.id)}
-                            title="Undo completion"
+                            onClick={() => undoCompletion(completion.id)}
+                            title="Undo — refunds points"
                             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/50 hover:text-white"
                           >
                             <X size={11} />
                           </button>
                         ) : (
-                          <span className="shrink-0 text-xs text-white/30">Pending</span>
+                          <span className="shrink-0 text-xs text-white/30">
+                            {completion?.status === 'pending' ? 'Review above' : completion?.status === 'rejected' ? '' : 'Pending'}
+                          </span>
                         )}
                       </div>
                     )
@@ -128,34 +206,35 @@ export default function OverviewTab() {
 
       <AnimatePresence>
         {viewing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6"
-            onClick={() => setViewing(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-              className="glass w-full max-w-sm overflow-hidden rounded-3xl"
-            >
-              <img src={viewing.photo} alt="" className="max-h-[70vh] w-full object-cover" />
-              <div className="flex items-center justify-between p-4">
-                <div className="text-xs text-white/40">
-                  Completed {new Date(viewing.completedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+          <ProofModal
+            completion={viewing}
+            chore={data.chores.find((c) => c.id === viewing.choreId)}
+            onClose={() => setViewing(null)}
+            footer={
+              viewing.status === 'pending' ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      rejectCompletion(viewing.id)
+                      setViewing(null)
+                    }}
+                    className="flex-1 rounded-xl bg-white/10 py-2 text-sm text-white/70 hover:bg-rose-500/20 hover:text-rose-300"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => {
+                      approveCompletion(viewing.id)
+                      setViewing(null)
+                    }}
+                    className="flex-1 rounded-xl bg-emerald-400/20 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-400/30"
+                  >
+                    Approve
+                  </button>
                 </div>
-                <button
-                  onClick={() => setViewing(null)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/60 hover:text-white"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+              ) : undefined
+            }
+          />
         )}
       </AnimatePresence>
     </div>

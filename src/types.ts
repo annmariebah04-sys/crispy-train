@@ -13,13 +13,15 @@ export interface Kid {
 }
 
 // A chore is a household-wide pool item — it isn't tied to one kid. Which
-// kid does it on a given day comes from that day's Assignment instead.
+// kid does it on a given day comes from that day's Assignment instead,
+// unless assignedKidId pins it to always go to one specific kid.
 export interface Chore {
   id: string
   title: string
   emoji: string
   points: number
   days: Weekday[] // which weekdays this chore is eligible; empty = every day
+  assignedKidId?: string // if set, always assigned to this kid instead of the random pool
   active: boolean
   createdAt: number
 }
@@ -34,13 +36,23 @@ export interface Assignment {
   createdAt: number
 }
 
+export type CompletionStatus = 'pending' | 'approved' | 'rejected'
+
+// A kid's submission of proof for a chore. Points are only awarded once a
+// parent approves it — submitting alone doesn't touch the kid's points.
 export interface Completion {
   id: string
   kidId: string
   choreId: string
   dayKey: string // which chore-cycle day this completion belongs to
-  photo: string // proof-of-completion photo, as a data URL
-  completedAt: number
+  status: CompletionStatus
+  photo?: string // proof photo, as a data URL
+  video?: string // proof video, as a Firebase Storage download URL
+  note?: string // written proof note
+  submittedAt: number
+  approvedAt?: number
+  reviewedAt?: number // set on approve or reject
+  rejectionNote?: string
 }
 
 export interface Reward {
@@ -66,7 +78,8 @@ export interface AppData {
   kids: Kid[]
   chores: Chore[]
   assignments: Assignment[]
-  completions: Completion[]
+  completions: Completion[] // today's completions only
+  pendingCompletions: Completion[] // all pending completions, any day — for the parent review queue
   rewards: Reward[]
   redemptions: Redemption[]
   parentPin: string
