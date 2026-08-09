@@ -74,7 +74,7 @@ export default function HistoryTab() {
                   <img src={c.photo} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
                 ) : (
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/5 text-lg">
-                    {c.video ? '🎥' : c.note ? '📝' : (chore?.emoji ?? '✅')}
+                    {c.note ? '📝' : (chore?.emoji ?? '✅')}
                   </span>
                 )}
                 <div className="min-w-0 flex-1">

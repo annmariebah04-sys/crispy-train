@@ -38,10 +38,6 @@ export default function ProofModal({ completion, chore, onClose, footer }: Props
         className="glass w-full max-w-sm overflow-hidden rounded-3xl"
       >
         {completion.photo && <img src={completion.photo} alt="" className="max-h-[60vh] w-full object-cover" />}
-        {completion.video && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video src={completion.video} controls className="max-h-[60vh] w-full bg-black" />
-        )}
         {completion.note && <p className="max-h-[40vh] overflow-y-auto p-4 text-sm text-white/80">{completion.note}</p>}
 
         <div className="flex items-center justify-between p-4">

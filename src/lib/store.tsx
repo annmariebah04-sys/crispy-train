@@ -165,7 +165,7 @@ interface StoreApi {
     patch: Partial<Pick<Chore, 'title' | 'emoji' | 'points' | 'days' | 'active' | 'assignedKidId'>>,
   ) => Promise<void>
   removeChore: (id: string) => Promise<void>
-  submitCompletion: (kidId: string, choreId: string, proof: { photo?: string; video?: string; note?: string }) => Promise<void>
+  submitCompletion: (kidId: string, choreId: string, proof: { photo?: string; note?: string }) => Promise<void>
   approveCompletion: (id: string) => Promise<void>
   rejectCompletion: (id: string, note?: string) => Promise<void>
   undoCompletion: (id: string) => Promise<void>
@@ -328,7 +328,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             status: 'pending',
             submittedAt: Date.now(),
             ...(proof.photo !== undefined ? { photo: proof.photo } : {}),
-            ...(proof.video !== undefined ? { video: proof.video } : {}),
             ...(proof.note !== undefined ? { note: proof.note } : {}),
           })
         })

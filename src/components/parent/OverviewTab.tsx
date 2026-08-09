@@ -36,7 +36,7 @@ export default function OverviewTab() {
                       <img src={c.photo} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
                     ) : (
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/5 text-lg">
-                        {c.video ? '🎥' : c.note ? '📝' : chore?.emoji}
+                        {c.note ? '📝' : chore?.emoji}
                       </span>
                     )}
                     <div className="min-w-0">
@@ -148,9 +148,7 @@ export default function OverviewTab() {
                             {completion.photo ? (
                               <img src={completion.photo} alt="" className="h-full w-full object-cover" />
                             ) : (
-                              <span className="flex h-full w-full items-center justify-center bg-white/5 text-base">
-                                {completion.video ? '🎥' : '📝'}
-                              </span>
+                              <span className="flex h-full w-full items-center justify-center bg-white/5 text-base">📝</span>
                             )}
                           </button>
                         ) : (

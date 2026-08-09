@@ -47,7 +47,6 @@ export interface Completion {
   dayKey: string // which chore-cycle day this completion belongs to
   status: CompletionStatus
   photo?: string // proof photo, as a data URL
-  video?: string // proof video, as a Firebase Storage download URL
   note?: string // written proof note
   submittedAt: number
   approvedAt?: number

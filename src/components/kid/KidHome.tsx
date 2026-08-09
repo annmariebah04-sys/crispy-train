@@ -4,7 +4,6 @@ import { ArrowLeft, Sparkles, Gift, Clock3, Pencil } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { GRADIENT, TEXT } from '../../lib/theme'
 import { fileToProofPhotoDataUrl } from '../../lib/image'
-import { uploadProofVideo } from '../../lib/storage'
 import ChoreCard from './ChoreCard'
 import RewardCard from './RewardCard'
 import CountdownPill from '../CountdownPill'
@@ -55,10 +54,9 @@ export default function KidHome({ kidId, onBack }: Props) {
     setTimeout(() => setToast(null), 2600)
   }
 
-  async function handleSubmitProof(choreId: string, input: { photoFile?: File; videoFile?: File; note?: string }) {
+  async function handleSubmitProof(choreId: string, input: { photoFile?: File; note?: string }) {
     const photo = input.photoFile ? await fileToProofPhotoDataUrl(input.photoFile) : undefined
-    const video = input.videoFile ? await uploadProofVideo(input.videoFile, kidId, choreId, today) : undefined
-    await submitCompletion(kidId, choreId, { photo, video, note: input.note })
+    await submitCompletion(kidId, choreId, { photo, note: input.note })
   }
 
   return (
