@@ -138,6 +138,25 @@ async function ensureAssignedForToday(dayKey: string, chores: Chore[], kids: Kid
     plan.push({ choreId: chore.id, kidId: chosen.id })
   }
 
+  // Guarantee every kid gets at least one chore whenever there are enough to
+  // go around. The per-chore "not the same as yesterday" exclusion above can
+  // otherwise rule one kid out of every single chore in a day (e.g. if they
+  // did every chore yesterday) — occasionally repeating someone's chore is a
+  // fairer trade than leaving them with literally nothing.
+  if (eligible.length >= kids.length) {
+    const pinnedChoreIds = new Set(
+      eligible.filter((c) => c.assignedKidId && kids.some((k) => k.id === c.assignedKidId)).map((c) => c.id),
+    )
+    for (const kid of kids) {
+      if (plan.some((p) => p.kidId === kid.id)) continue
+      const loadByKid = new Map<string, number>()
+      for (const p of plan) loadByKid.set(p.kidId, (loadByKid.get(p.kidId) ?? 0) + 1)
+      const donorCandidates = plan.filter((p) => !pinnedChoreIds.has(p.choreId) && (loadByKid.get(p.kidId) ?? 0) > 1)
+      const donorEntry = donorCandidates.find((p) => lastKidForChore.get(p.choreId) !== kid.id) ?? donorCandidates[0]
+      if (donorEntry) donorEntry.kidId = kid.id
+    }
+  }
+
   try {
     await runTransaction(db, async (tx) => {
       const marker = await tx.get(markerRef)
