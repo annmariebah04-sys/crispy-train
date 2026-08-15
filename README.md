@@ -6,7 +6,7 @@ A sleek, dark-mode chores & rewards app for 3 kids. Built with React, TypeScript
 
 - **Kid profiles** — pick an avatar (emoji or an uploaded photo), a background image, a color, and a name for each of the 3 kids.
 - **Randomized daily chores** — parents build a shared pool of household chores (wash dishes, sweep, empty the dishwasher, etc.). Every day, the app randomly hands them out across the kids, making sure nobody gets the exact chore they had the day before. A chore can also be pinned to always go to one specific kid instead of the random pool.
-- **Noon reset** — the chore day runs on a cycle that ends at **12:00 PM**. A countdown pill shows time left; at noon the board resets and a new day's chores get assigned.
+- **Midnight reset** — the chore day runs on a cycle that ends at **12:00 AM**. A countdown pill shows time left; at midnight the board resets and a new day's chores get assigned.
 - **Proof required, parent-approved** — to mark a chore done, a kid attaches a photo and/or a written note. It goes into the parent's review queue as **pending** — points are only awarded once a parent taps Approve (or Reject, which sends it back for another try).
 - **Points & rewards** — approving a chore awards points. Kids can unlock parent-defined rewards once they have enough points; redemption requests wait for parent approval in the dashboard.
 - **Parent dashboard** (PIN-gated, default `1234`) — a "Needs your review" queue front and center for approving/rejecting proof, a chore pool + reward manager, a **History** tab of every past completion (photo/note, points, date, filterable by kid), kid profile management, and PIN settings.

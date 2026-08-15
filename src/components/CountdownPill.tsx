@@ -13,7 +13,7 @@ export default function CountdownPill() {
   return (
     <div className="glass flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-white/70">
       <Clock size={13} className="text-amber-400" />
-      Chores due by 12:00 PM &middot; <span className="text-amber-300">{label}</span>
+      Chores due by 12:00 AM &middot; <span className="text-amber-300">{label}</span>
     </div>
   )
 }

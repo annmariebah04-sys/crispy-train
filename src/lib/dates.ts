@@ -1,6 +1,6 @@
-// Chores run on a daily cycle that ends at 12:00 PM (noon).
+// Chores run on a daily cycle that ends at 12:00 AM (midnight).
 // The "chore day" key is the calendar date on which the current cycle started.
-export const CYCLE_END_HOUR = 12
+export const CYCLE_END_HOUR = 0
 
 export function pad(n: number) {
   return n.toString().padStart(2, '0')
